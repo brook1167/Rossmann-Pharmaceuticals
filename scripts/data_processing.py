@@ -10,6 +10,14 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_squared_log_error
 from datetime import datetime
+import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
+from tensorflow.keras.optimizers import Adam
+
 
 
 def extract_date_features(df):
@@ -25,6 +33,34 @@ def extract_date_features(df):
                           labels=['Winter', 'Spring', 'Summer', 'Fall'],
                           include_lowest=True)
     return df
+
+def check_stationarity(timeseries):
+    """Check whether your time Series Data is Stationary."""
+    result = adfuller(timeseries, autolag='AIC')
+    print('ADF Statistic: {:.10f}'.format(result[0]))
+    print('p-value: {:.10f}'.format(result[1]))
+    print('Critical Values:')
+    for key, value in result[4].items():
+        print('\t{}: {:.10f}'.format(key, value))
+    
+    # If p-value > 0.05, the time series is non-stationary
+    if result[1] > 0.05:
+        print("The time series is non-stationary")
+    else:
+        print("The time series is stationary")
+
+
+def create_supervised_data(data, n_step=1):
+    """Transform the time series data into supervised learning data"""
+    X, y = [], []
+    for i in range(len(data) - n_step - 1):
+        X.append(data[i:(i + n_step), 0])
+        y.append(data[i + n_step, 0])
+
+        logger.info(f'Supervised data created with n_step = {n_step}')
+        logger.info(f'X shape: {np.array(X).shape}, y shape: {np.array(y).shape}')
+    return np.array(X), np.array(y)
+
 
 
 def create_preprocessing_pipeline():
