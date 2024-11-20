@@ -1,139 +1,124 @@
-import os
 import pandas as pd
-import numpy as np
-import joblib
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, MinMaxScaler
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_squared_log_error
-from datetime import datetime
 import matplotlib.pyplot as plt
-from statsmodels.tsa.stattools import adfuller
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
-from tensorflow.keras.optimizers import Adam
 
-class TimeSeriesModel:
-    def __init__(self, df):
+class DataProcessor:
+    def __init__(self, df: pd.DataFrame):
         self.df = df
-        self.preprocessor = self.create_preprocessing_pipeline()
+    
+    # Method to get the first 10 rows of the DataFrame
+    def get_head(self):
+        return self.df.head(10)
+    
+    # Method to get the last 10 rows of the DataFrame
+    def get_tail(self):
+        return self.df.tail(10)
+    
+    # Method to get descriptive statistics of the DataFrame
+    def get_describe(self):
+        return self.df.describe()
+    
+    # Method to get the shape (dimensions) of the DataFrame (rows, columns)
+    def get_shape(self):
+        return self.df.shape
+    
+    # Method to get the list of column names
+    def get_columns(self):
+        return self.df.columns.tolist()
 
-    def extract_date_features(self):
-        self.df['Year'] = self.df['Date'].dt.year
-        self.df['Month'] = self.df['Date'].dt.month
-        self.df['Day'] = self.df['Date'].dt.day
-        self.df['DayOfWeek'] = self.df['Date'].dt.dayofweek
-        self.df['IsWeekend'] = self.df['DayOfWeek'].isin([5, 6]).astype(int)
-        self.df['DayOfMonth'] = self.df['Date'].dt.day
-        self.df['WeekOfYear'] = self.df['Date'].dt.isocalendar().week
-        self.df['Season'] = pd.cut(self.df['Month'], 
-                                   bins=[0, 3, 6, 9, 12], 
-                                   labels=['Winter', 'Spring', 'Summer', 'Fall'],
-                                   include_lowest=True)
-        return self.df
+    # Method to calculate missing values and their percentages for the DataFrame
+    def get_missing_values(self):
+        missing_data = self.df.isnull().sum()
+        missing_percentage = (missing_data / len(self.df)) * 100
+        missing_values = pd.DataFrame({
+            'num_missing': missing_data,
+            'percent_missing (%)': missing_percentage
+        })
+        return missing_values[missing_values['num_missing'] > 0].sort_values(by='percent_missing (%)', ascending=False)
 
-    def check_stationarity(self, timeseries):
-        """Check whether your time Series Data is Stationary."""
-        result = adfuller(timeseries, autolag='AIC')
-        print(f'ADF Statistic: {result[0]:.10f}')
-        print(f'p-value: {result[1]:.10f}')
-        print('Critical Values:')
-        for key, value in result[4].items():
-            print(f'\t{key}: {value:.10f}')
+    # Function to get missing values and their percentages in a given column
+    def get_column_missing_values(self, column: str):
+        if column not in self.df.columns:
+            return f"Column '{column}' not found in DataFrame."
         
-        # If p-value > 0.05, the time series is non-stationary
-        if result[1] > 0.05:
-            print("The time series is non-stationary")
-        else:
-            print("The time series is stationary")
-
-    def create_supervised_data(self, data, n_step=1):
-        """Transform the time series data into supervised learning data"""
-        X, y = [], []
-        for i in range(len(data) - n_step - 1):
-            X.append(data[i:(i + n_step), 0])
-            y.append(data[i + n_step, 0])
-
-        return np.array(X), np.array(y)
-
-    def create_preprocessing_pipeline(self):
-        numeric_features = ['Store', 'DayOfWeek', 'DayOfMonth', 'WeekOfYear', 'Year', 'Month', 
-                            'CompetitionDistance', 'CompetitionOpenSinceMonth', 
-                            'CompetitionOpenSinceYear', 'Promo2SinceWeek', 'Promo2SinceYear']
-        categorical_features = ['StoreType', 'Assortment', 'StateHoliday', 'SchoolHoliday', 
-                                'Season', 'Promo', 'Promo2']
-
-        numeric_transformer = Pipeline(steps=[('scaler', StandardScaler())])
-        categorical_transformer = Pipeline(steps=[('onehot', OneHotEncoder(handle_unknown='ignore'))])
-
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ('num', numeric_transformer, numeric_features),
-                ('cat', categorical_transformer, categorical_features)
-            ])
-
-        return preprocessor
-
-    def build_model(self):
-        # Manually tuned parameters due to resource
-        rf = RandomForestRegressor(
-            n_estimators=200, 
-            max_depth=64, 
-            criterion='squared_error',
-            min_samples_split=10, 
-            min_samples_leaf=2, 
-            n_jobs=-1, 
-            random_state=42)
-        return rf
-
-    def train_model(self, model, X_train, y_train):
-        model.fit(X_train, y_train)
-        return model
-
-    def evaluate_model(self, model, X_test, y_test):
-        y_pred = model.predict(X_test)
-        mse = mean_squared_error(y_test, y_pred)
-        mae = mean_absolute_error(y_test, y_pred)
-        rmse = np.sqrt(mse)
-        r2 = r2_score(y_test, y_pred)
-        msle = mean_squared_log_error(y_test, y_pred)
-        return mse, mae, rmse, r2, msle
-
-    def get_feature_importance(self, model):
-        # Extract the names of numeric and one-hot encoded categorical features
-        numeric_features = self.preprocessor.transformers_[0][2]
-        categorical_transformer = self.preprocessor.transformers_[1][1]  # The pipeline that has OneHotEncoder
-        categorical_features = self.preprocessor.transformers_[1][1]['onehot'].get_feature_names_out(self.preprocessor.transformers_[1][2])
+        num_missing = self.df[column].isnull().sum()
+        percent_missing = (num_missing / len(self.df)) * 100
         
-        # Combine both numeric and categorical feature names
-        feature_names = list(numeric_features) + list(categorical_features)
+        return {
+            'column': column,
+            'num_missing': num_missing,
+            'percent_missing (%)': percent_missing
+        }
+
+    # Method to plot the distribution of the 'Promo' column in both train and test DataFrames
+    def plot_promo_distribution(self, df_train: pd.DataFrame, df_test: pd.DataFrame):
+        # Ensure that the 'Promo' column exists in both DataFrames
+        if 'Promo' not in df_train.columns or 'Promo' not in df_test.columns:
+            return "The 'Promo' column is not present in both train and test DataFrames."
         
-        # Get feature importance from the model
-        feature_importance = model.feature_importances_
-        
-        # Create a DataFrame for feature importance
-        importance_df = pd.DataFrame({'feature': feature_names, 'importance': feature_importance})
-        return importance_df.sort_values('importance', ascending=False)
+        # Get value counts for the 'Promo' column in both datasets
+        train_distribution = df_train['Promo'].value_counts()
+        test_distribution = df_test['Promo'].value_counts()
 
-    def calculate_confidence_interval(self, y_pred, confidence=0.95):
-        n = len(y_pred)
-        m = np.mean(y_pred)
-        se = np.std(y_pred, ddof=1) / np.sqrt(n)
-        h = se * np.abs(np.random.standard_t(df=n-1, size=1))
-        return m - h, m + h
+        # Create a figure with two subplots
+        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
 
-    def serialize_model(self, model, path):
-        timestamp = datetime.now().strftime("%d-%m-%Y-%H-%M-%S-%f")
-        filename = f'model_{timestamp}.pkl'
-        full_path = os.path.join(path, filename)
-        joblib.dump(model, full_path)
-        return filename
+        # Plot training distribution
+        ax[0].bar(train_distribution.index.astype(str), train_distribution)
+        ax[0].set_title("Promo Distribution on Training Set")
+        ax[0].set_xlabel("Promo")
+        ax[0].set_ylabel("Count")
 
-    def plot_acf_pacf(self):
-        fig, axes = plt.subplots(1, 2, figsize=(16, 4))
-        plot_acf(self.df['y'], ax=axes[0])
-        plot_pacf(self.df['y'], ax=axes[1])
+        # Plot testing distribution
+        ax[1].bar(test_distribution.index.astype(str), test_distribution)
+        ax[1].set_title("Promo Distribution on Testing Set")
+        ax[1].set_xlabel("Promo")
+        ax[1].set_ylabel("Count")
+
+        # Show the plots
+        plt.tight_layout()
+        plt.show()
+
+    # Method to plot average sales around Christmas and Easter
+    def plot_sales_around_holidays(self, train_store: pd.DataFrame):
+        # Ensure necessary columns are present
+        required_columns = ['Open', 'Year', 'Month', 'Day', 'Sales']
+        if not all(col in train_store.columns for col in required_columns):
+            return "The required columns (Open, Year, Month, Day, Sales) are not present in the DataFrame."
+
+        # Filter the data for open stores in 2014
+        open_store = train_store[(train_store.Open == 1) & (train_store.Year == 2014)]
+
+        # Define months for Christmas and Easter
+        christmas_month = 12
+        easter_month = 4
+
+        # Filter data for December (Christmas) and April (Easter)
+        christmas_data = open_store[open_store.Month == christmas_month]
+        easter_data = open_store[open_store.Month == easter_month]
+
+        # Filter around Christmas (Days 21 to 29)
+        around_christmas = christmas_data[(christmas_data['Day'] > 20) & (christmas_data['Day'] < 30)]
+        around_christmas = around_christmas[['Day', 'Sales']].groupby('Day').mean()
+
+        # Filter around Easter (Days 16 to 24)
+        around_easter = easter_data[(easter_data['Day'] > 15) & (easter_data['Day'] < 25)]
+        around_easter = around_easter[['Day', 'Sales']].groupby('Day').mean()
+
+        # Create subplots
+        fig, axs = plt.subplots(2, 1, figsize=(10, 10))
+
+        # Plot for Christmas sales
+        axs[0].bar(around_christmas.index, around_christmas['Sales'], color='green', alpha=0.7)
+        axs[0].set_title('Sales during Christmas (Dec 25)')
+        axs[0].set_xlabel('Day')
+        axs[0].set_ylabel('Average Sales')
+
+        # Plot for Easter sales
+        axs[1].bar(around_easter.index, around_easter['Sales'], color='blue', alpha=0.7)
+        axs[1].set_title('Sales during Easter (April 20)')
+        axs[1].set_xlabel('Day')
+        axs[1].set_ylabel('Average Sales')
+
+        # Adjust layout
+        plt.tight_layout()
         plt.show()
