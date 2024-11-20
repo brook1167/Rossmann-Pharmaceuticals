@@ -7,7 +7,21 @@
 
 As a Machine Learning Engineer at Rossmann Pharmaceuticals, the finance team has identified a critical need to forecast sales across all stores in various cities six weeks in advance. Currently, store managers rely on their experience and personal judgment for sales predictions, which can lead to inconsistencies and inaccuracies.
 
-To enhance forecasting accuracy, the data team has pinpointed several key factors influencing sales, including promotions, competition, school and state holidays, seasonality, and locality.
+To enhance forecasting accuracy, the data team has pinpointed several key factors influencing sales, including promotions, competition, school and state holidays, seasonality, and locality. The goal is to develop a robust machine learning model that can forecast store sales more effectively by leveraging these factors.
+
+In the initial phase of the project, exploratory data analysis (EDA) is essential to understand customer purchasing behavior across different stores. By analyzing factors such as the impact of promotions, holidays, and store openings, we can uncover valuable insights that drive sales. This task involves cleaning the data, handling outliers and missing values, and visualizing the relationships between key features, such as sales, promotions, and customer behaviors.
+
+Key questions to explore include:
+
+- How do promotions affect sales, and are they attracting more customers?
+
+- What are the seasonal trends in purchasing behavior, particularly around holidays like Christmas and Easter?
+
+- How does store competition, including proximity to other stores and the opening or closing of new competitors, influence sales?
+
+Following this, we will preprocess the data for machine learning, including feature extraction, handling missing data, and scaling the data. Various models will be evaluated to predict daily sales, such as tree-based models (e.g., Random Forest Regressor) and deep learning techniques like Long Short-Term Memory (LSTM) networks, which are particularly useful for time-series forecasting.
+
+The project will culminate in building an API to serve these models for real-time sales predictions, which will help Rossmann Pharmaceuticals plan ahead and optimize their resources effectively.
 
 ## Objective
 
